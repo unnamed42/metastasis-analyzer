@@ -86,10 +86,11 @@
    <addaction name="menu_F"/>
    <addaction name="menu_V"/>
   </widget>
-  <widget class="QStatusBar" name="statusbar"/>
+  <widget class="QStatusBar" name="statusBar"/>
   <action name="openAction">
    <property name="icon">
-    <iconset theme="document-open"/>
+    <iconset theme="document-open">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>打开DICOM(&amp;O)</string>
@@ -100,7 +101,8 @@
   </action>
   <action name="labelAction">
    <property name="icon">
-    <iconset theme="document-open"/>
+    <iconset theme="document-open">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>打开标签文件(&amp;L)</string>
@@ -111,7 +113,8 @@
   </action>
   <action name="exitAction">
    <property name="icon">
-    <iconset theme="application-exit"/>
+    <iconset theme="application-exit">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>退出(&amp;Q)</string>
@@ -122,7 +125,8 @@
   </action>
   <action name="setWindowAction">
    <property name="icon">
-    <iconset theme="view-refresh"/>
+    <iconset theme="view-refresh">
+     <normaloff>.</normaloff>.</iconset>
    </property>
    <property name="text">
     <string>设置窗位与窗宽(&amp;W)</string>

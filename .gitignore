@@ -122,6 +122,3 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
-
-# generated python source from Qt Designer UI
-app/ui/generated
