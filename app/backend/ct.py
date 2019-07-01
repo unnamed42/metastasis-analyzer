@@ -47,6 +47,10 @@ def filter_scans(scans, labels):
         filtered_labels.append(labels[:, :, i])
     return np.dstack(filtered_scans), np.dstack(filtered_labels)
 
+def spacing(dicom):
+    params = list(dicom.PixelSpacing) + [dicom.SliceThickness]
+    return np.array(params, dtype=np.float32)
+
 def get_pixel_hu(scan):
     """
     Convert pydicom scan to CT HU values,
@@ -84,16 +88,6 @@ def windowing(data, window_level, window_width):
                              (min_visible, max_visible),
                              (0, 255)).astype(np.uint8)
     return ret
-
-def as_grayscale(data):
-    """
-    Directly map HU value to grayscale image
-    @param data: numpy array, dtype=np.int16
-    @return: numpy array of same size, dtype=np.uint8
-    """
-    return np.interp(data,
-                     (data.min(), data.max()),
-                     (0, 255)).astype(np.uint8)
 
 def resample(images, spacing, new_spacing=(1, 1, 1)):
     """Resample HU images to new spacing, by default is [1, 1, 1]
