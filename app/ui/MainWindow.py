@@ -1,16 +1,26 @@
 import numpy as np
 
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtGui import QPixmap, QImage
 from PyQt5.QtCore import pyqtSlot, Qt, QRectF
 from PyQt5.QtWidgets import (QMainWindow, qApp, QWidget,
                              QGraphicsPixmapItem, QGraphicsScene,
                              QDialog, QFileDialog)
 
-from app.ui.utils import toQImage
 from app.ui.WindowDialog import WindowDialog
 from app.ui.MainWindowModel import MainWindowModel as Model
 from app.ui.generated.Ui_MainWindow import Ui_MainWindow as Ui
 from app.backend.windowLevels import defaultLevels
+
+def _toQImage(ndarray):
+    """
+    Convert numpy 8-bit grayscale image to QImage
+    """
+    height, width = ndarray.shape
+    # TODO: more memory efficient data passing
+    #addr, rw = ndarray.__array_interface__["data"]
+    #content = voidptr(addr, writeable=rw)
+    content = ndarray.tobytes()
+    return QImage(content, width, height, QImage.Format_Grayscale8)
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -46,7 +56,7 @@ class MainWindow(QMainWindow):
         image to QPixmap
         """
         grayscale = self._model.imageAt(n - 1)
-        return QPixmap.fromImage(toQImage(grayscale))
+        return QPixmap.fromImage(_toQImage(grayscale))
 
     @pyqtSlot(int)
     def _on_imagesChanged(self, imagesCount: int):

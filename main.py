@@ -2,7 +2,7 @@ from sys import argv, exit
 
 from PyQt5.QtWidgets import QApplication
 
-from app.ui.MainWindow import MainWindow
+from app.ui import MainWindow
 
 
 if __name__ == "__main__":
