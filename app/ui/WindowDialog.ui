@@ -110,5 +110,21 @@
     </hint>
    </hints>
   </connection>
+  <connection>
+   <sender>presetComboBox</sender>
+   <signal>currentIndexChanged(int)</signal>
+   <receiver>WindowDialog</receiver>
+   <slot>on_selectionChanged(int)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>191</x>
+     <y>35</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>146</x>
+     <y>119</y>
+    </hint>
+   </hints>
+  </connection>
  </connections>
 </ui>

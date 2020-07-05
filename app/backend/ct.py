@@ -107,7 +107,7 @@ def resample(images, spacing, new_spacing=(1, 1, 1)):
     images = zoom(images, real_resize_factor)
     return images
 
-def make_lung_mask(image):
+def make_lung_mask(image, crop=True):
     """Mask lung region for the given slice
     @param image: np.array, one slice of lung CT
     @return: mask image, np.array(dtype=bool) of same shape
@@ -116,7 +116,10 @@ def make_lung_mask(image):
     cols = image.shape[1]
     image = _z_score(image)
 
-    middle = image[int(cols/5):int(cols/5*4), int(rows/5):int(rows/5*4)]
+    if crop:
+        middle = image[int(cols/5):int(cols/5*4), int(rows/5):int(rows/5*4)]
+    else:
+        middle = image
     mean = np.mean(middle)
     image[image == np.min(image)] = mean
     image[image == np.max(image)] = mean

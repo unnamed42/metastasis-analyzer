@@ -1,5 +1,6 @@
 import numpy as np
 import gc
+import torch
 
 from typing import Tuple
 
@@ -7,6 +8,7 @@ from PyQt5.QtCore import QObject, pyqtSignal
 
 from app.backend import ct
 from app.backend.utils import z
+from app.ct.loaders import load_mhd
 
 def _spacing(scan):
     space = list(scan.PixelSpacing) + [scan.SliceThickness]
@@ -26,11 +28,20 @@ class MainWindowModel(QObject):
         else:
             self._images = None
             self._spacing = None
+        self._model = torch.load("/home/h/ma/data/model.pt")
+        self._model.eval()
+        self._model.cpu()
 
-    def loadScans(self, path: str):
+    def loadDICOMScans(self, path: str):
         scans = ct.load_scans(path)
         self._hu = np.dstack([ct.get_pixel_hu(s) for s in scans])
         self._spacing = _spacing(scans[0])
+        self._rewindow()
+
+    def loadMHDScans(self, path: str):
+        scans, spacing = load_mhd(path)
+        self._hu = np.dstack(scans)
+        self._spacing = spacing
         self._rewindow()
 
     def loadLabels(self, path: str):

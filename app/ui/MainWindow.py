@@ -1,19 +1,20 @@
+import torch
 import numpy as np
+import matplotlib.pyplot as plt
 
-from PyQt5.QtGui import QPixmap, QImage
-from PyQt5.QtCore import pyqtSlot, Qt, QRectF
-from PyQt5.QtWidgets import (QMainWindow, qApp, QWidget,
-                             QGraphicsPixmapItem, QGraphicsScene,
-                             QDialog, QFileDialog)
+from PyQt5.QtGui import QPixmap, QImage, QKeySequence
+from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt, QRectF
+from PyQt5.QtWidgets import QMainWindow, QLabel, QHBoxLayout, QDialog, QFileDialog
 
+from .generated.Ui_MainWindow import Ui_MainWindow as Ui
 from app.ui.WindowDialog import WindowDialog
 from app.ui.MainWindowModel import MainWindowModel as Model
-from app.ui.generated.Ui_MainWindow import Ui_MainWindow as Ui
 from app.backend.windowLevels import defaultLevels
+from app.ct import make_lung_mask, getCAM
 
-def _toQImage(ndarray):
+def _toQImage(ndarray: np.ndarray) -> QImage:
     """
-    Convert numpy 8-bit grayscale image to QImage
+    8-bit灰度图(numpy格式)转换为QImage
     """
     height, width = ndarray.shape
     # TODO: more memory efficient data passing
@@ -22,33 +23,40 @@ def _toQImage(ndarray):
     content = ndarray.tobytes()
     return QImage(content, width, height, QImage.Format_Grayscale8)
 
+def _toNumpyArray(pixmap: QPixmap) -> np.ndarray:
+    """
+    取出QPixmap中的图像，转换成numpy数组
+    """
+    size = pixmap.size()
+    h, w = size.width(), size.height()
+    image = pixmap.toImage()
+    bytesArray = image.bits().tobytes()
+    npImage = np.frombuffer(bytesArray, dtype=np.uint8).reshape((w, h, 4))
+    return npImage
+
+class CTArray:
+    def __init__(self, modelPath: str, window):
+        self._model = torch.load(modelPath)
+
+
 class MainWindow(QMainWindow):
+    cutStateChanged = pyqtSignal(bool)
+
     def __init__(self):
         super().__init__()
 
         window = defaultLevels["lung"]
 
         self._ui = Ui()
-        self._setupUi()
+        self._ui.setupUi(self)
         self._model = Model(window)
         self._vars = dict(window=defaultLevels["lung"])
+        self._cutState = False
 
         # backend
         self._model.imagesChanged.connect(self._on_imagesChanged)
-        # menubar
-        self._ui.exitAction.triggered.connect(qApp.quit)
-        self._ui.openAction.triggered.connect(self._on_openDICOM)
-        self._ui.labelAction.triggered.connect(self._on_openLabel)
-        self._ui.setWindowAction.triggered.connect(self._on_setWindow)
-        # image slice change
-        self._ui.imageSpinBox.valueChanged.connect(self._on_changeSlice)
-        self._ui.imageSlider.valueChanged.connect(self._on_changeSlice)
-
-    def _setupUi(self):
-        self._ui.setupUi(self)
-        self._ui.imageDisplay = None # set later in slots
-        self._ui.imageScene = QGraphicsScene(self)
-        self._ui.imageView.setScene(self._ui.imageScene)
+        self.cutStateChanged.connect(self._ui.imageView._on_cutStateChanged)
+        self._ui.imageView.cutFinished.connect(self._on_predictSelected)
 
     def _ctAt(self, n: int):
         """
@@ -56,24 +64,56 @@ class MainWindow(QMainWindow):
         image to QPixmap
         """
         grayscale = self._model.imageAt(n - 1)
+        if self._ui.triggerLungSeg.isChecked():
+            mask = make_lung_mask(grayscale)
+            print(np.count_nonzero(mask))
+            masked = np.where(mask == True, grayscale, 0)
+            grayscale = masked
         return QPixmap.fromImage(_toQImage(grayscale))
+
+    def keyPressEvent(self, event):
+        if self._ui.imageView.isCutting() and event.matches(QKeySequence.Cancel):
+            self.cutStateChanged.emit(False)
+
+    @pyqtSlot()
+    def on_predict(self):
+        self.cutStateChanged.emit(True)
+
+    @pyqtSlot()
+    def _on_predictSelected(self):
+        # print("fuck")
+        widget = QDialog(self)
+        layout = QHBoxLayout(widget)
+        widget.setLayout(layout)
+        # image = QPixmap("/home/h/thesis/image/result-fuck.png")
+        image = self._ui.imageView.selectedImage()
+        # image = _toNumpyArray(pixmap)
+        # mask = getCAM(self._model.model, image)
+        # mask[mask <= 0.6] = 0
+        label = QLabel(widget)
+        label.setPixmap(image)
+        layout.addWidget(label)
+        widget.exec_()
 
     @pyqtSlot(int)
     def _on_imagesChanged(self, imagesCount: int):
         self._ui.imageSpinBox.setMaximum(imagesCount)
         self._ui.imageSlider.setMaximum(imagesCount)
         currentIdx = min(self._ui.imageSlider.value(), imagesCount)
-        self._on_changeSlice(currentIdx)
+        self.on_sliceChanged(currentIdx)
 
     @pyqtSlot()
-    def _on_openDICOM(self):
-        path = str(QFileDialog.getExistingDirectory(self, "选择DICOM序列所在文件夹"))
-        if path:
-            self._model.loadScans(path)
-            self._vars.update(path=path)
+    def on_openDICOM(self):
+        path = QFileDialog.getOpenFileName(self, "MHD", ".", "MHD Files (*.mhd)")
+        #path = str(QFileDialog.getExistingDirectory(self, "选择DICOM序列所在文件夹"))
+        path = str(path[0])
+        if not path:
+            return
+        self._model.loadMHDScans(path)
+        self._vars.update(path=path)
 
     @pyqtSlot()
-    def _on_openLabel(self):
+    def on_openLabel(self):
         path = self._vars.get("path", "")
         path, _ = QFileDialog.getOpenFileName(self, "选择标签文件",
                                               path, "nrrd (*.nrrd)")
@@ -82,7 +122,7 @@ class MainWindow(QMainWindow):
             self._model.loadLabels(str(path))
 
     @pyqtSlot(int)
-    def _on_changeSlice(self, index: int):
+    def on_sliceChanged(self, index: int):
         if not self._model.loaded():
             return
         # synchronize slider and combobox value
@@ -90,18 +130,13 @@ class MainWindow(QMainWindow):
         self._ui.imageSlider.setValue(index)
         # set display image
         pixmap = self._ctAt(index)
-        display = self._ui.imageDisplay
-        if display is None:
-            pixmapItem = self._ui.imageScene.addPixmap(pixmap)
-            self._ui.imageDisplay = pixmapItem
-        else:
-            display.setPixmap(pixmap)
+        self._ui.imageView.setImage(pixmap)
         # reset scene to fit content
         rect = QRectF(.0, .0, pixmap.width(), pixmap.height())
         self._ui.imageView.setSceneRect(rect)
 
     @pyqtSlot()
-    def _on_setWindow(self):
+    def on_setWindow(self):
         dialog = WindowDialog(self._model.window(), self)
         if dialog.exec_() == QDialog.Accepted:
             self._model.setWindow(dialog.window())
